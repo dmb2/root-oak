@@ -35,12 +35,11 @@
     (goto-char (point-max))
     (insert (format "- %s: [[file:./posts/%s][%s]]\n" time post-fname post-title))
     (save-buffer)))
-(defun write-task-list (task-fname task-list)
+(defun write-task-list (task-fname)
   (with-current-buffer (find-file-noselect task-fname)
     (goto-char (point-max))
-    (insert task-list)
+    (yank)
     (save-buffer)))
-
 (defun write-post-file (post-fname post-dir post-title post-content-fname)
   "Write out the header information for this post"
   (with-temp-file (expand-file-name post-fname post-dir)
@@ -97,17 +96,18 @@
 	   (notebook-archive-fname (make-archive-fname notebook-short-name "archive.org"))
 	   (notebook-digest-fname (make-archive-fname notebook-short-name "digest.org"))
 	   (notebook-task-fname (make-archive-fname notebook-short-name "tasks.org"))) 
-      (if (file-exists-p notebook-archive-fname)
-	  (delete-file notebook-archive-fname))
-      (if (file-exists-p notebook-digest-fname)
-	  (delete-file notebook-digest-fname))
-      (if (file-exists-p notebook-task-fname)
-	  (delete-file notebook-task-fname))
+      (mapcar (lambda (x)
+		(when (file-exists-p x)
+		  (delete-file x))) 
+	      (list notebook-archive-fname
+		    notebook-digest-fname
+		    notebook-task-fname))
       (mapc
        (lambda (top-level)
 	 (find-file notebook-file)
 	 (goto-char (point-min))
-	 (outline-next-visible-heading 1)
+	 (org-global-cycle 1)
+	 (outline-next-visible-heading top-level)
 	 (org-map-tree
 	  (lambda ()
 	    (let* ((tags (org-entry-get nil "TAGS"))
@@ -116,12 +116,16 @@
 		  (is-digest (if tags (string-match "digest" tags) nil))
 		  (is-task-list (if tags (string-match "tasks" tags) nil)))
 	      (unless is-classified
-	      ;;TODO export task list to a page
-		(cond (is-task-list (write-task-list notebook-task-fname (buffer-substring (point-min) (point-max))))
+		(cond (is-task-list (save-excursion (org-copy-subtree)
+						    (write-task-list notebook-task-fname)))
 		      ((and time is-digest) (write-post tags time notebook-digest-fname))
 		      (time (write-post tags time notebook-archive-fname)))
 		))))) 
-       '(1))
-      (kill-buffer (get-short-fname notebook-digest-fname))
-      (kill-buffer (get-short-fname notebook-archive-fname)))))
-;(project-title (org-publish-find-title notebook-file))
+       '(1 2 3))
+      (mapcar (lambda (x)
+		(when (get-buffer (get-short-fname x)) 
+		  (kill-buffer (get-short-fname x)))) 
+	      (list notebook-archive-fname
+		    notebook-digest-fname
+		    notebook-task-fname)))))
+
