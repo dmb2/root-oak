@@ -26,6 +26,12 @@
   :type 'string
   :group 'root-inferior)
 
+(defun eval-buffer-in-root ()
+  "Evaluate this buffer in the ROOT process.  If buffer is
+associated with a file, compile it, if not dump it in a temporary
+file and execute it interactively."
+  ())
+
 ;; This code is inspired by octave-inf.el
 (defun inferior-root (arg)
   "Start an inferior ROOT process, buffer is put into root-repl-mode.
@@ -89,7 +95,7 @@ and `inferior-root-mode-hook'."
 	mode-line-process '(":%s")
 	comint-prompt-read-only t)
   (set-syntax-table c++-mode-syntax-table)
-  (set (make-local-variable 'font-lock-multiline) t)
+  ;(set (make-local-variable 'font-lock-multiline) t)
   (c-basic-common-init)
   (c-font-lock-init)
   (ansi-color-for-comint-mode-filter)

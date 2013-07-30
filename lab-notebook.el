@@ -1,5 +1,5 @@
 ;;; lab-notebook.el -- Helper functions to publish a lab notebook with
-;;; org-mode and jekyll
+;;; org-mode 
 
 ;; Copyright (C) 2013 David Bjergaard
 
@@ -82,7 +82,9 @@
 (defun make-archive-fname (notebook-name name)
   "Return the path to an archive of the form `notebook-name'-`name' in `*org-project-publish-dir*'"
   (expand-file-name 
-   (mapconcat 'identity `(,(substring notebook-name 0 -4) ,name) "-")  *org-project-publish-dir*))
+   (mapconcat 'identity 
+	      `(,(substring notebook-name 0 -4) ,name) "-")  
+   *org-project-publish-dir*))
 (defun get-short-fname (fname-path)
   (car (last (split-string fname-path "/"))))
 (defun split-project-file ()
@@ -122,6 +124,8 @@
 		      (time (write-post tags time notebook-archive-fname)))
 		))))) 
        '(1))
-      (kill-buffer (get-short-fname notebook-digest-fname))
-      (kill-buffer (get-short-fname notebook-archive-fname)))))
+      (when (buffer-live-p (get-short-fname notebook-digest-fname)) 
+	(kill-buffer (get-short-fname notebook-digest-fname)))
+      (when (buffer-live-p (get-short-fname notebook-archive-fname)) 
+	(kill-buffer (get-short-fname notebook-archive-fname))))))
 ;(project-title (org-publish-find-title notebook-file))
