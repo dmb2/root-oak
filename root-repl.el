@@ -72,11 +72,13 @@ Unless ARG is non-nil, switch to this buffer."
 (defun root-output-filter (output)
   "Filter output from the ROOT process"
   (let ((sani-output (cdr (split-string (ansi-color-filter-apply output) "\n"))))
-    (message "%s" sani-output)
+    ;(message "%s" sani-output)
     (if sani-output
     	(mapconcat 'identity sani-output  "\n")
       " ")))
-
+(setq root-repl-keywords
+      '(;(*inf-root-prompt* . font-lock-comment-face)
+	("Error.*\\|Warning.*" . font-lock-warning-face)))
 (define-derived-mode inferior-root-mode comint-mode "root-repl"
   "Major mode for interacting with an inferior ROOT process.
 
@@ -87,7 +89,8 @@ and `inferior-root-mode-hook'."
   (setq comint-prompt-regexp *inf-root-prompt*
 	comint-move-point-for-output 'all
 	mode-line-process '(":%s")
-	comint-prompt-read-only t)
+	comint-prompt-read-only t
+	font-lock-defaults '(root-repl-keywords))
   (ansi-color-for-comint-mode-filter)
   (add-hook 'comint-preoutput-filter-functions 'root-output-filter)
   (setq comint-input-ring-file-name
