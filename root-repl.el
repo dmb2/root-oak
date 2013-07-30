@@ -56,7 +56,7 @@ Unless ARG is non-nil, switch to this buffer."
 	  inferior-root-process proc)
     (goto-char (point-max))
     (set-marker (process-mark proc) (point))
-    (set-process-filter proc 'inferior-root-output-filter)
+    (set-process-filter proc 'comint-output-filter)
     (run-hooks 'inferior-root-startup-hook)))
 
 (defun inferior-root-output-filter (proc string)
@@ -72,11 +72,10 @@ Unless ARG is non-nil, switch to this buffer."
 (defun root-output-filter (output)
   "Filter output from the ROOT process"
   (let ((sani-output (cdr (split-string (ansi-color-filter-apply output) "\n"))))
-    ;(message "%s" sani-output)
+    (message "%s" sani-output)
     (if sani-output
-    	(mapconcat 'identity sani-output "\n")
-      " ")
-    ))
+    	(mapconcat 'identity sani-output  "\n")
+      " ")))
 
 (define-derived-mode inferior-root-mode comint-mode "root-repl"
   "Major mode for interacting with an inferior ROOT process.
@@ -86,16 +85,10 @@ and `inferior-root-mode-hook'."
 
   (make-local-variable 'comint-prompt-read-only)
   (setq comint-prompt-regexp *inf-root-prompt*
+	comint-move-point-for-output 'all
 	mode-line-process '(":%s")
 	comint-prompt-read-only t)
-  (set-syntax-table c++-mode-syntax-table)
-  (set (make-local-variable 'font-lock-multiline) t)
-  (c-basic-common-init)
-  (c-font-lock-init)
   (ansi-color-for-comint-mode-filter)
-  (setq local-abbrev-table c++-mode-abbrev-table
-  	abbrev-mode t)
-  (use-local-map c++-mode-map)
   (add-hook 'comint-preoutput-filter-functions 'root-output-filter)
   (setq comint-input-ring-file-name
 	(or *root-hist* "~/.root_hist")
