@@ -26,11 +26,29 @@
   :type 'string
   :group 'root-inferior)
 
+(defvar root-inferior-mode-map
+  (let ((map (nconc (make-sparse-keymap) comint-mode-map)))
+    (define-key map "\t" 'completion-at-point) map)
+  "Basic mode map for `run-root'")
 (defun eval-buffer-in-root ()
   "Evaluate this buffer in the ROOT process.  If buffer is
-associated with a file, compile it, if not dump it in a temporary
-file and execute it interactively."
+associated with a file and does not start with '{' or end with
+'}', compile it, else execute it, if buffer is unassociated if
+not dump it in a temporary file and execute it interactively."
   ())
+
+(defun eval-last-c-exp ()
+  "Evaluate c-exp before point in the ROOT buffer, print result
+  in minibuffer. Interactively, with prefix argument, print
+  output value into current buffer. Truncates long output
+  according to the value of the variables
+  `eval-expression-print-length' and
+  `eval-expression-print-level'. See `eval-last-sexp'.
+
+  Does not enter debugger on error, check ROOT buffer in case of
+  unexpected behavior/output."
+  ())
+
 
 ;; This code is inspired by octave-inf.el
 (defun inferior-root (arg)
@@ -69,6 +87,7 @@ Unless ARG is non-nil, switch to this buffer."
   "Taken from Octave mode, ring Emacs bell if output starts with
   ASCII bell, pass the rest to `comint-output-filter'."
   (comint-output-filter proc (inferior-root-strip-ctrl-g string)))
+
 (defun inferior-root-strip-ctrl-g (string)
   "Strip ctrl-g from begining of string"
   (when (string-match "^\a" string)
@@ -77,21 +96,35 @@ Unless ARG is non-nil, switch to this buffer."
   string)
 (defun root-output-filter (output)
   "Filter output from the ROOT process"
-  (let ((sani-output (cdr (split-string (ansi-color-filter-apply output) "\n"))))
-    ;(message "%s" sani-output)
+  (let ((sani-output (cdr (split-string output "\n"))))
+    (message "%s" sani-output)
     (if sani-output
     	(mapconcat 'identity sani-output  "\n")
-      " ")))
+      "")))
 (setq root-repl-keywords
-      '(;(*inf-root-prompt* . font-lock-comment-face)
-	("Error.*\\|Warning.*" . font-lock-warning-face)))
+      '(("\.x|\.L|\.class|\.files\.!"	 . font-lock-constant-face)
+	("Error.*"			 . font-lock-warning-face)
+	("Warning.*"			 . font-lock-negation-char-face)
+	("Info.*"	                 . font-lock-doc-face)
+	("\\*\\*\\*.*\\*\\*\\*"          . font-lock-negation-char-face)
+	("//.*"                          . font-lock-comment-face)))
+
+(defun inferior-root--initialize ()
+  "Initialize buffer-local comint variables"
+  (setq comint-process-echoes t
+	comint-use-prompt-regexp nil))
+
 (define-derived-mode inferior-root-mode comint-mode "root-repl"
   "Major mode for interacting with an inferior ROOT process.
 
 Entry to this mode successively runs the hooks `comint-mode-hook'
 and `inferior-root-mode-hook'."
 
-  (make-local-variable 'comint-prompt-read-only)
+  (let ((local-vars '(comint-prompt-read-only
+					;font-lock-defaults
+		      )))
+    (mapc (lambda (var) (make-local-variable var))
+	  local-vars))
   (setq comint-prompt-regexp *inf-root-prompt*
 	comint-move-point-for-output 'all
 	mode-line-process '(":%s")
@@ -99,7 +132,10 @@ and `inferior-root-mode-hook'."
 	font-lock-defaults '(root-repl-keywords))
   (ansi-color-for-comint-mode-filter)
   (add-hook 'comint-preoutput-filter-functions 'root-output-filter)
+  (add-hook 'inferior-root-mode-hook 'inferior-root--initialize)
   (setq comint-input-ring-file-name
 	(or *root-hist* "~/.root_hist")
 	comint-input-ring-size 1024)
   (comint-read-input-ring t))
+
+(provide 'root-oak)
