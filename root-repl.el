@@ -97,10 +97,11 @@ Unless ARG is non-nil, switch to this buffer."
 (defun root-output-filter (output)
   "Filter output from the ROOT process"
   (let ((sani-output (cdr (split-string output "\n"))))
-    (message "%s" sani-output)
+    ;(message "%s" output)
+    ;(message "%s" sani-output)
     (if sani-output
     	(mapconcat 'identity sani-output  "\n")
-      "")))
+      "") (mapconcat 'identity sani-output  "\n")) )
 (setq root-repl-keywords
       '(("\.x|\.L|\.class|\.files\.!"	 . font-lock-constant-face)
 	("Error.*"			 . font-lock-warning-face)
@@ -138,4 +139,4 @@ and `inferior-root-mode-hook'."
 	comint-input-ring-size 1024)
   (comint-read-input-ring t))
 
-(provide 'root-oak)
+(provide 'root-repl)

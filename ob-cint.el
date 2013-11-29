@@ -1,6 +1,6 @@
 ;;; ob-template.el --- org-babel functions for template evaluation
 
-;; Copyright (C) your name here
+;; Copyright (C) David Bjergaard
 
 ;; Author: David Bjergaard <dbjergaard@gmail.com>
 ;; Keywords: literate programming, reproducible research
