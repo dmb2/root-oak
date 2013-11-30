@@ -4,6 +4,7 @@
   :group 'root)
 (defcustom *root-hist* nil
   "Path to Inferior ROOT history file, if nil defaults to \"~/.root_hist\"")
+
 (defcustom *root-sys* (getenv "ROOTSYS")
   "Directory where root lives"
   :type 'string
@@ -80,7 +81,7 @@ Unless ARG is non-nil, switch to this buffer."
 	  inferior-root-process proc)
     (goto-char (point-max))
     (set-marker (process-mark proc) (point))
-    (set-process-filter proc 'comint-output-filter)
+    (set-process-filter proc 'inferior-root-output-filter)
     (run-hooks 'inferior-root-startup-hook)))
 
 (defun inferior-root-output-filter (proc string)
@@ -96,12 +97,11 @@ Unless ARG is non-nil, switch to this buffer."
   string)
 (defun root-output-filter (output)
   "Filter output from the ROOT process"
-  (let ((sani-output (cdr (split-string output "\n"))))
-    ;(message "%s" output)
-    ;(message "%s" sani-output)
-    (if sani-output
-    	(mapconcat 'identity sani-output  "\n")
-      "") (mapconcat 'identity sani-output  "\n")) )
+  (let ((newline-loc (string-match "\n" output)))
+    (substring output 
+	       (if newline-loc (+ 1 newline-loc)
+		 0)
+	     (length output))))
 (setq root-repl-keywords
       '(("\.x|\.L|\.class|\.files\.!"	 . font-lock-constant-face)
 	("Error.*"			 . font-lock-warning-face)
@@ -139,4 +139,4 @@ and `inferior-root-mode-hook'."
 	comint-input-ring-size 1024)
   (comint-read-input-ring t))
 
-(provide 'root-repl)
+(provide 'root-inf)
