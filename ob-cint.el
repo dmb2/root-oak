@@ -26,29 +26,8 @@
 
 ;;; Commentary:
 
-;; This file is not intended to ever be loaded by org-babel, rather it
-;; is a template for use in adding new language support to Org-babel.
-;; Good first steps are to copy this file to a file named by the
-;; language you are adding, and then use `query-replace' to replace
-;; all strings of "cint" in this file with the name of your new
-;; language.
-;;
-;; If you have questions as to any of the portions of the file defined
-;; below please look to existing language support for guidance.
-;;
-;; If you are planning on adding a language to org-babel we would ask
-;; that if possible you fill out the FSF copyright assignment form
-;; available at http://orgmode.org/request-assign-future.txt as this
-;; will make it possible to include your language support in the core
-;; of Org-mode, otherwise unassigned language support files can still
-;; be included in the contrib/ directory of the Org-mode repository.
-
 ;;; Requirements:
-
-;; Use this section to list the requirements of this language.  Most
-;; languages will require that at least the language be installed on
-;; the user's system, and the Emacs major mode relevant to the
-;; language be installed as well.
+;; root-inf
 
 ;;; Code:
 (require 'ob)
@@ -56,12 +35,18 @@
 (require 'ob-comint)
 (require 'ob-eval)
 ;; possibly require modes required for your language
-
+(require 'root-inf)
 ;; optionally define a file extension for this language
 (add-to-list 'org-babel-tangle-lang-exts '("cint" . "tmp"))
 
 ;; optionally declare default header arguments for this language
 (defvar org-babel-default-header-args:cint '())
+(defvar org-babel-cint-eoe-indicator "\'org_babel_eoe\'")
+(defvar org-babel-cint-eoe-output "ans = org_babel_eoe")
+(defvar org-babel-cint-wrapper-method
+  "%s
+FILE* fid = fopen('%s', 'w'); fprintf(fid, '%%s\\n', ans); fclose(fid);
+")
 
 ;; This function expands the body of a source code block by doing
 ;; things like prepending argument definitions to the body, it should
@@ -110,7 +95,28 @@ called by `org-babel-execute-src-block'"
          (result-type (fourth processed-params))
          ;; expand the body with `org-babel-expand-body:cint'
          (full-body (org-babel-expand-body:cint
-                     body params processed-params)))
+                     body params processed-params))
+	 (graphical-out-file (org-babel-cint-graphical-output-file params))
+	 (result (org-babel-cint-evaluate
+		  session
+		  (if graphical-out-file
+		      (mapconcat 'identity
+				 (list
+				  "gROOT->SetBatch()"
+				  full-body
+				  (format "c1->SaveAs(\"%s\")" graphical-out-file))
+				 "\n")
+		    full-body)
+		  result-type)))
+    (if graphical-out-file
+	nil
+	(org-babel-reassemble-table
+	 result
+	 (org-babel-pick-name
+	  (cdr (assoc :colname-names params)) (cdr (assoc :colnames params)))
+	 (org-babel-pick-name
+	  (cdr (assoc :rowname-names params)) (cdr (assoc :rownames params)))))
+
     ;; actually execute the source-code block either in a session or
     ;; possibly by dropping it to a temporary file and evaluating the
     ;; file.
@@ -126,12 +132,86 @@ called by `org-babel-execute-src-block'"
     ;; the function `org-babel-process-file-name'. (See the way that
     ;; function is used in the language files)
     ))
+(defun org-babel-cint-graphical-output-file (params)
+  "Name of file to which ROOT should send graphical output."
+  (and (member "graphics" (cdr (assq :result-params params)))
+       (cdr (assq :file params))))
 
 ;; This function should be used to assign any variables in params in
 ;; the context of the session environment.
 (defun org-babel-prep-session:cint (session params)
   "Prepare SESSION according to the header arguments specified in PARAMS."
-  )
+  (let* ((session (org-babel-cint-initiate-session session params))
+  	 (var-lines (org-babel-variable-assignments:cint params)))
+    (org-babel-comint-in-buffer session
+      (mapc (lambda (var)
+              (end-of-line 1) (insert var) (comint-send-input nil t)
+              (org-babel-comint-wait-for-output session)) var-lines))
+    session))
+
+(defun org-babel-cint-read-string (string)
+  "Strip \\\"s from around cint string."
+  (if (string-match "^\"\\([^\000]+\\)\"$" string)
+      (match-string 1 string)
+    string))
+
+(defun org-babel-cint-evaluate-session
+  (session body result-type)
+  "Evaluate BODY in SESSION."
+  (let* ((tmp-file (org-babel-temp-file "cint-"))
+	 (full-body
+	  (case result-type
+	    (output
+	     (mapconcat
+	      #'org-babel-chomp
+	      (list body org-babel-cint-eoe-indicator) "\n"))
+	    (value (mapconcat
+		#'org-babel-chomp
+		(list (format org-babel-cint-wrapper-method
+			      body
+			      (org-babel-process-file-name tmp-file 'noquote)
+			      (org-babel-process-file-name tmp-file 'noquote))
+		      org-babel-cint-eoe-indicator) "\n"))))
+	 (raw (org-babel-comint-with-output
+		    (session
+		     org-babel-cint-eoe-output
+		     t full-body)
+		  (insert full-body) (comint-send-input nil t)))
+	 results)
+    (case result-type
+      (value
+       (org-babel-cint-import-elisp-from-file tmp-file))
+      (output
+       (progn
+	 (setq results
+	       (cdr (member org-babel-cint-eoe-output
+			      (reverse (mapcar
+					#'org-babel-cint-read-string
+					(mapcar #'org-babel-trim raw))))))
+	 (mapconcat #'identity (reverse results) "\n"))))))
+
+(defun org-babel-cint-evaluate-external-process (body result-type)
+  "Evaluate BODY in an external cint process."
+  (let ((cmd org-babel-cint-shell-command))
+    (case result-type
+      (output (org-babel-eval cmd body))
+      (value (let ((tmp-file (org-babel-temp-file "cint-")))
+	       (org-babel-eval
+		cmd
+		(format org-babel-cint-wrapper-method body
+			(org-babel-process-file-name tmp-file 'noquote)
+			(org-babel-process-file-name tmp-file 'noquote)))
+	       (org-babel-cint-import-elisp-from-file tmp-file))))))
+
+(defun org-babel-cint-evaluate
+  (session body result-type)
+  "Pass BODY to the ROOT process in SESSION.
+If RESULT-TYPE equals 'output then return the outputs of the
+statements in BODY, if RESULT-TYPE equals 'value then return the
+value of the last statement in BODY, as elisp."
+  (if session
+      (org-babel-cint-evaluate-session session body result-type)
+    (org-babel-cint-evaluate-external-process body result-type)))
 
 (defun org-babel-cint-var-to-cint (var)
   "Convert an elisp var into a string of cint source code
@@ -141,13 +221,20 @@ specifying a var of the same value."
 (defun org-babel-cint-table-or-string (results)
   "If the results look like a table, then convert them into an
 Emacs-lisp table, otherwise return the results as a string."
-  )
+  (message "Implement cint-table-or-string!")
+  results)
 
-(defun org-babel-cint-initiate-session (&optional session)
+(defun org-babel-cint-initiate-session (&optional session params)
   "If there is not a current inferior-process-buffer in SESSION
 then create.  Return the initialized session."
   (unless (string= session "none")
-    ))
+    (let ((session (or session "*Inferior ROOT*")))
+      (if (org-babel-comint-buffer-livep session) session
+	(save-window-excursion
+	  (run-root)
+	  (rename-buffer (if (bufferp session) (buffer-name session)
+			   (if (stringp session) session (buffer-name))))
+	  (current-buffer))))))
 
 (provide 'ob-cint)
 ;;; ob-cint.el ends here

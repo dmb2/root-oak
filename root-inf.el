@@ -22,7 +22,7 @@
   "Regexp for ROOT prompt"
   :type 'regexp
   :group 'root-inferior)
-(defcustom inferior-root-buffer "*ROOT repl*"
+(defcustom inferior-root-buffer "*ROOT Inferior*"
   "Name of buffer for running an inferior ROOT process."
   :type 'string
   :group 'root-inferior)
@@ -31,25 +31,6 @@
   (let ((map (nconc (make-sparse-keymap) comint-mode-map)))
     (define-key map "\t" 'completion-at-point) map)
   "Basic mode map for `run-root'")
-(defun eval-buffer-in-root ()
-  "Evaluate this buffer in the ROOT process.  If buffer is
-associated with a file and does not start with '{' or end with
-'}', compile it, else execute it, if buffer is unassociated if
-not dump it in a temporary file and execute it interactively."
-  ())
-
-(defun eval-last-c-exp ()
-  "Evaluate c-exp before point in the ROOT buffer, print result
-  in minibuffer. Interactively, with prefix argument, print
-  output value into current buffer. Truncates long output
-  according to the value of the variables
-  `eval-expression-print-length' and
-  `eval-expression-print-level'. See `eval-last-sexp'.
-
-  Does not enter debugger on error, check ROOT buffer in case of
-  unexpected behavior/output."
-  ())
-
 
 ;; This code is inspired by octave-inf.el
 (defun inferior-root (arg)
