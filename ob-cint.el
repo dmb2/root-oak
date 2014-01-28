@@ -87,7 +87,7 @@ called by `org-babel-execute-src-block'"
   (message "executing Cint source code block")
   (let* ((processed-params (org-babel-process-params params))
          ;; set the session if the session variable is non-nil
-         (session (org-babel-cint-initiate-session (first processed-params)))
+         (session (org-babel-cint-initiate-session))
          ;; variables assigned for use in the block
          (vars (second processed-params))
          (result-params (third processed-params))
@@ -102,20 +102,20 @@ called by `org-babel-execute-src-block'"
 		  (if graphical-out-file
 		      (mapconcat 'identity
 				 (list
-				  "gROOT->SetBatch()"
+				  "gROOT->SetBatch();"
 				  full-body
-				  (format "c1->SaveAs(\"%s\")" graphical-out-file))
+				  (format "c1->SaveAs(\"%s\");" graphical-out-file))
 				 "\n")
 		    full-body)
 		  result-type)))
     (if graphical-out-file
-	nil
-	(org-babel-reassemble-table
-	 result
-	 (org-babel-pick-name
-	  (cdr (assoc :colname-names params)) (cdr (assoc :colnames params)))
-	 (org-babel-pick-name
-	  (cdr (assoc :rowname-names params)) (cdr (assoc :rownames params)))))
+    	nil
+    	(org-babel-reassemble-table
+    	 result
+    	 (org-babel-pick-name
+    	  (cdr (assoc :colname-names params)) (cdr (assoc :colnames params)))
+    	 (org-babel-pick-name
+    	  (cdr (assoc :rowname-names params)) (cdr (assoc :rownames params)))))
 
     ;; actually execute the source-code block either in a session or
     ;; possibly by dropping it to a temporary file and evaluating the
@@ -158,37 +158,7 @@ called by `org-babel-execute-src-block'"
 (defun org-babel-cint-evaluate-session
   (session body result-type)
   "Evaluate BODY in SESSION."
-  (let* ((tmp-file (org-babel-temp-file "cint-"))
-	 (full-body
-	  (case result-type
-	    (output
-	     (mapconcat
-	      #'org-babel-chomp
-	      (list body org-babel-cint-eoe-indicator) "\n"))
-	    (value (mapconcat
-		#'org-babel-chomp
-		(list (format org-babel-cint-wrapper-method
-			      body
-			      (org-babel-process-file-name tmp-file 'noquote)
-			      (org-babel-process-file-name tmp-file 'noquote))
-		      org-babel-cint-eoe-indicator) "\n"))))
-	 (raw (org-babel-comint-with-output
-		    (session
-		     org-babel-cint-eoe-output
-		     t full-body)
-		  (insert full-body) (comint-send-input nil t)))
-	 results)
-    (case result-type
-      (value
-       (org-babel-cint-import-elisp-from-file tmp-file))
-      (output
-       (progn
-	 (setq results
-	       (cdr (member org-babel-cint-eoe-output
-			      (reverse (mapcar
-					#'org-babel-cint-read-string
-					(mapcar #'org-babel-trim raw))))))
-	 (mapconcat #'identity (reverse results) "\n"))))))
+  (org-babel-comint-in-buffer session body))
 
 (defun org-babel-cint-evaluate-external-process (body result-type)
   "Evaluate BODY in an external cint process."
@@ -209,9 +179,7 @@ called by `org-babel-execute-src-block'"
 If RESULT-TYPE equals 'output then return the outputs of the
 statements in BODY, if RESULT-TYPE equals 'value then return the
 value of the last statement in BODY, as elisp."
-  (if session
-      (org-babel-cint-evaluate-session session body result-type)
-    (org-babel-cint-evaluate-external-process body result-type)))
+  (org-babel-cint-evaluate-session session body result-type))
 
 (defun org-babel-cint-var-to-cint (var)
   "Convert an elisp var into a string of cint source code
@@ -228,10 +196,10 @@ Emacs-lisp table, otherwise return the results as a string."
   "If there is not a current inferior-process-buffer in SESSION
 then create.  Return the initialized session."
   (unless (string= session "none")
-    (let ((session (or session "*Inferior ROOT*")))
+    (let ((session (or session "*ROOT Inferior*")))
       (if (org-babel-comint-buffer-livep session) session
 	(save-window-excursion
-	  (run-root)
+	  (run-root nil)
 	  (rename-buffer (if (bufferp session) (buffer-name session)
 			   (if (stringp session) session (buffer-name))))
 	  (current-buffer))))))
